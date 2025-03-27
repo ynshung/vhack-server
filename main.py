@@ -2,7 +2,10 @@ from flask import Flask, request, jsonify
 import requests
 import os
 import json
+import base64
+import whisper
 from dotenv import load_dotenv
+import ssl
 from transformer import get_similar_command
 
 app = Flask(__name__)
@@ -26,11 +29,29 @@ def process_speech(audio_url, audio_config):
     speech_results = response.json()
     return speech_results
 
+def process_speech_whisper(audio_base64):
+    audio_data = base64.b64decode(audio_base64)
+    audio_path = "temp_audio.wav"
+    
+    with open(audio_path, "wb") as f:
+        f.write(audio_data)
+    
+    ssl._create_default_https_context = ssl._create_unverified_context
+    model = whisper.load_model("base")
+    
+    result = model.transcribe(audio_path)
+    
+    # Remove temporary audio file
+    os.remove(audio_path)
+    
+    return result
 
 @app.route("/api/process-speech", methods=["POST"])
 def process_speech_flask():
     data = request.get_json()
-    speech_results = process_speech(data["audioUrl"], data["config"])
+    speech_results = process_speech_whisper(data["audioUrl"]) # Whisper
+    # speech_results = process_speech(data["audioUrl"], data["config"]) # Google
+    print(speech_results)
     return jsonify(speech_results)
 
 
